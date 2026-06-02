@@ -1,1 +1,15 @@
 
+---
+java_version: 17
+
+jenkins_port: 8080
+
+jenkins_home: /var/lib/jenkins
+
+jenkins_plugins_file: /var/lib/jenkins/plugins.txt
+
+jenkins_casc_file: /var/lib/jenkins/casc.yaml
+
+docker_service_name: docker
+
+jenkins_service_name: jenkins

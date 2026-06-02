@@ -72,3 +72,8 @@
   service:
     name: jenkins
     state: restarted
+
+- name: Install Jenkins Plugins
+  import_tasks: plugins.yml
+
+  

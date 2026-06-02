@@ -1,1 +1,18 @@
 
+---
+jenkins_admin_user: AniketWakekar
+jenkins_admin_password: 123
+
+dockerhub_username: aniketwakekar
+dockerhub_password: "[-----DOCKERHUB_PASSWORD-----]"
+
+gmail_id: aniketwakekar239@gmail.com
+gmail_app_password: "[-----GMAIL_APP_PASSWORD-----]"
+
+github_url: https://github.com/Wakekar
+
+jenkins_url: "http://[-----JENKINS_SERVER_IP-----]:8080"
+
+sonarqube_url: "http://[-----SONAR_SERVER_IP-----]:9000"
+
+nexus_url: "http://[-----NEXUS_SERVER_IP-----]:8081"

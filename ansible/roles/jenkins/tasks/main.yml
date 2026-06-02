@@ -1,50 +1,74 @@
 ---
-- name: Install Java
-  apt:
-    name: openjdk-17-jre-headless
-    state: present
-    update_cache: yes
 
-- name: Download Jenkins Key
+* name: Install Java
+  apt:
+  name: openjdk-17-jre-headless
+  state: present
+  update_cache: yes
+
+* name: Download Jenkins Key
   get_url:
-    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-    dest: /usr/share/keyrings/jenkins-keyring.asc
+  url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+  dest: /usr/share/keyrings/jenkins-keyring.asc
 
-- name: Add Jenkins Repository
+* name: Add Jenkins Repository
   shell: |
-    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.d/jenkins.list
+  echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.d/jenkins.list
 
-- name: Update apt cache
+* name: Update apt Cache
   apt:
-    update_cache: yes
+  update_cache: yes
 
-- name: Install Jenkins
+* name: Install Jenkins
   apt:
-    name: jenkins
-    state: present
+  name: jenkins
+  state: present
 
-- name: Start Jenkins Service
+* name: Start Jenkins Service
   service:
-    name: jenkins
-    state: started
-    enabled: yes
+  name: jenkins
+  state: started
+  enabled: yes
 
-- name: Create Jenkins directory
+* name: Create Jenkins Home Directory
   file:
-    path: /var/lib/jenkins
-    state: directory
-    owner: jenkins
-    group: jenkins
-    mode: '0755'
+  path: /var/lib/jenkins
+  state: directory
+  owner: jenkins
+  group: jenkins
+  mode: "0755"
 
-- name: Copy plugins list
+* name: Create Jenkins Plugins Directory
+  file:
+  path: /var/lib/jenkins/plugins
+  state: directory
+  owner: jenkins
+  group: jenkins
+  mode: "0755"
+
+* name: Copy Plugins List
   copy:
-    src: plugins.txt
-    dest: /var/lib/jenkins/plugins.txt
+  src: plugins.txt
+  dest: /var/lib/jenkins/plugins.txt
+  owner: jenkins
+  group: jenkins
   notify: restart jenkins
 
-- name: Copy JCasC file
+* name: Copy JCasC File
   copy:
-    src: casc.yaml
-    dest: /var/lib/jenkins/casc.yaml
-  notify: restart jenkins    
+  src: casc.yaml
+  dest: /var/lib/jenkins/casc.yaml
+  owner: jenkins
+  group: jenkins
+  notify: restart jenkins
+
+* name: Configure JCasC Environment Variable
+  lineinfile:
+  path: /etc/default/jenkins
+  line: 'CASC_JENKINS_CONFIG=/var/lib/jenkins/casc.yaml'
+  create: yes
+
+* name: Restart Jenkins
+  service:
+  name: jenkins
+  state: restarted

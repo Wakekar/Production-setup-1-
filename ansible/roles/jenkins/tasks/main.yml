@@ -28,3 +28,20 @@
     name: jenkins
     state: started
     enabled: yes
+
+- name: Create plugins directory
+  file:
+    path: /var/lib/jenkins
+    state: directory
+
+- name: Copy plugins list
+  copy:
+    src: plugins.txt
+    dest: /var/lib/jenkins/plugins.txt
+  notify: restart jenkins
+
+- name: Copy JCasC file
+  copy:
+    src: casc.yaml
+    dest: /var/lib/jenkins/casc.yaml
+  notify: restart jenkins    

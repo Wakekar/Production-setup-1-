@@ -62,12 +62,11 @@
     mode: "0644"
   notify: restart jenkins
 
-- name: Configure JCasC Environment Variable
-  lineinfile:
-    path: /etc/default/jenkins
-    line: 'CASC_JENKINS_CONFIG=/var/lib/jenkins/casc.yaml'
-    create: yes
-
+- name: Configure Jenkins Environment
+  template:
+    src: jenkins.env.j2
+    dest: /etc/default/jenkins
+    
 - name: Restart Jenkins
   service:
     name: jenkins

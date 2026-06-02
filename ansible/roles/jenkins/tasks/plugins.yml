@@ -1,0 +1,5 @@
+---
+- name: Install Jenkins Plugins
+  shell: |
+    jenkins-plugin-cli --plugin-file /var/lib/jenkins/plugins.txt
+  notify: restart jenkins

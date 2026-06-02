@@ -1,0 +1,26 @@
+---
+- name: Install dependencies
+  apt:
+    name:
+      - wget
+      - apt-transport-https
+      - gnupg
+    state: present
+    update_cache: yes
+
+- name: Download Trivy GPG Key
+  shell: |
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+
+- name: Add Trivy Repository
+  shell: |
+    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" > /etc/apt/sources.list.d/trivy.list
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install Trivy
+  apt:
+    name: trivy
+    state: present

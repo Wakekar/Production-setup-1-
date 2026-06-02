@@ -10,3 +10,14 @@ pipeline-stage-view
 pipeline-maven
 email-ext
 prometheus
+
+workflow-aggregator
+git
+github
+ssh-slaves
+credentials
+plain-credentials
+matrix-auth
+job-dsl
+ansible
+blueocean

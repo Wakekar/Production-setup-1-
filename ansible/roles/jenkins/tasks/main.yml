@@ -5,29 +5,33 @@
     state: present
     update_cache: yes
 
-- name: Download Jenkins Key
+- name: Create Jenkins user
+  user:
+    name: jenkins
+    home: /var/lib/jenkins
+    shell: /bin/bash
+    create_home: yes
+
+- name: Create Jenkins installation directory
+  file:
+    path: /opt/jenkins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0755"
+
+- name: Download Jenkins WAR
   get_url:
-    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-    dest: /usr/share/keyrings/jenkins-keyring.asc
+    url: https://get.jenkins.io/war-stable/latest/jenkins.war
+    dest: /opt/jenkins/jenkins.war
+    mode: "0644"
 
-- name: Add Jenkins Repository
-  shell: |
-    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.d/jenkins.list
-
-- name: Update apt Cache
-  apt:
-    update_cache: yes
-
-- name: Install Jenkins
-  apt:
-    name: jenkins
-    state: present
-
-- name: Start Jenkins Service
-  service:
-    name: jenkins
-    state: started
-    enabled: yes
+- name: Set Jenkins directory ownership
+  file:
+    path: /opt/jenkins
+    owner: jenkins
+    group: jenkins
+    recurse: yes
 
 - name: Create Jenkins Home Directory
   file:
@@ -66,13 +70,33 @@
   template:
     src: jenkins.env.j2
     dest: /etc/default/jenkins
-    
-- name: Restart Jenkins
+
+- name: Create Jenkins systemd service
+  copy:
+    dest: /etc/systemd/system/jenkins.service
+    content: |
+      [Unit]
+      Description=Jenkins
+      After=network.target
+
+      [Service]
+      User=jenkins
+      WorkingDirectory=/opt/jenkins
+      ExecStart=/usr/bin/java -jar /opt/jenkins/jenkins.war --httpPort=8080
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: Start Jenkins Service
   service:
     name: jenkins
-    state: restarted
+    state: started
+    enabled: yes
 
 - name: Install Jenkins Plugins
   import_tasks: plugins.yml
-
-  

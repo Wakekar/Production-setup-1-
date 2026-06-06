@@ -1,6 +1,6 @@
 
 [jenkins]
-[-----JENKINS_SERVER_IP-----]
+65.2.151.66
 
 [jenkins:vars]
 ansible_user=ubuntu

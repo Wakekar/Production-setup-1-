@@ -1,0 +1,447 @@
+-------------------------------------
+Project Structure
+---------------------------------------------------------------------------------------------
+
+Production-setup-1-
+
+├── ansible.cfg
+├── ansible
+│   ├── inventory
+│   ├── site.yml
+│   └── roles
+│       ├── docker
+│       │   └── tasks
+│       │       └── main.yml
+│       ├── jenkins
+│       │   ├── defaults
+│       │   │   └── main.yml
+│       │   ├── files
+│       │   │   ├── casc.yaml
+│       │   │   └── plugins.txt
+│       │   ├── handlers
+│       │   │   └── main.yml
+│       │   ├── tasks
+│       │   │   ├── main.yml
+│       │   │   └── plugins.yml
+│       │   ├── templates
+│       │   │   ├── credentials.yaml.j2
+│       │   │   ├── jenkins.env.j2
+│       │   │   ├── jenkins.yaml.j2
+│       │   │   ├── master-casc.yaml.j2
+│       │   │   ├── smtp.yaml.j2
+│       │   │   └── tools.yaml.j2
+│       │   └── vars
+│       │       └── main.yml
+│       └── trivy
+│           └── tasks
+│               └── main.yml
+FILE: ansible.cfg
+
+[defaults]
+inventory = ansible/inventory
+host_key_checking = False
+retry_files_enabled = False
+timeout = 30
+
+[ssh_connection]
+pipelining = True
+FILE: ansible/inventory
+[jenkins]
+[-----JENKINS_SERVER_IP-----]
+
+[jenkins:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=DevOps.pem
+FILE: ansible/site.yml
+
+
+
+---
+- name: Configure Jenkins Server
+  hosts: jenkins
+  become: true
+
+  roles:
+    - docker
+    - jenkins
+    - trivy
+
+
+
+FILE: ansible/roles/docker/tasks/main.yml
+---
+- name: Update apt packages
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+
+- name: Create docker keyring directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download docker gpg key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+- name: Add docker repository
+  shell: |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+- name: Start docker
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+
+FILE: ansible/roles/trivy/tasks/main.yml
+---
+- name: Install dependencies
+  apt:
+    name:
+      - wget
+      - apt-transport-https
+      - gnupg
+    state: present
+    update_cache: yes
+
+- name: Download Trivy GPG Key
+  shell: |
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+
+- name: Add Trivy Repository
+  shell: |
+    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" > /etc/apt/sources.list.d/trivy.list
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install Trivy
+  apt:
+    name: trivy
+    state: present
+
+
+
+FILE: ansible/roles/jenkins/defaults/main.yml
+---
+java_version: 21
+
+jenkins_port: 8080
+
+jenkins_home: /var/lib/jenkins
+
+jenkins_plugins_file: /var/lib/jenkins/plugins.txt
+
+jenkins_casc_file: /var/lib/jenkins/casc.yaml
+
+docker_service_name: docker
+
+jenkins_service_name: jenkins
+FILE: ansible/roles/jenkins/files/casc.yaml
+jenkins:
+  systemMessage: "Jenkins configured automatically by Ansible"
+
+
+
+FILE: ansible/roles/jenkins/files/plugins.txt
+docker
+docker-pipeline
+docker-build-step
+sonar
+kubernetes
+kubernetes-cli
+config-file-provider
+pipeline-stage-view
+pipeline-maven
+email-ext
+prometheus
+
+workflow-aggregator
+git
+github
+ssh-slaves
+credentials
+plain-credentials
+matrix-auth
+job-dsl
+ansible
+blueocean
+
+
+
+FILE: ansible/roles/jenkins/handlers/main.yml
+---
+- name: restart jenkins
+  service:
+    name: jenkins
+    state: restarted
+
+
+FILE: ansible/roles/jenkins/tasks/main.yml
+---
+- name: Install Java
+  apt:
+    name: openjdk-21-jdk
+    state: present
+    update_cache: yes
+
+- name: Create Jenkins user
+  user:
+    name: jenkins
+    home: /var/lib/jenkins
+    shell: /bin/bash
+    create_home: yes
+
+- name: Create Jenkins installation directory
+  file:
+    path: /opt/jenkins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0755"
+
+- name: Download Jenkins WAR
+  get_url:
+    url: https://get.jenkins.io/war-stable/latest/jenkins.war
+    dest: /opt/jenkins/jenkins.war
+    mode: "0644"
+
+- name: Set Jenkins directory ownership
+  file:
+    path: /opt/jenkins
+    owner: jenkins
+    group: jenkins
+    recurse: yes
+
+- name: Create Jenkins Home Directory
+  file:
+    path: /var/lib/jenkins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0755"
+
+- name: Create Jenkins Plugins Directory
+  file:
+    path: /var/lib/jenkins/plugins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0755"
+
+- name: Copy Plugins List
+  copy:
+    src: plugins.txt
+    dest: /var/lib/jenkins/plugins.txt
+    owner: jenkins
+    group: jenkins
+  notify: restart jenkins
+
+- name: Deploy Master JCasC Configuration
+  template:
+    src: master-casc.yaml.j2
+    dest: /var/lib/jenkins/casc.yaml
+    owner: jenkins
+    group: jenkins
+    mode: "0644"
+  notify: restart jenkins
+
+- name: Configure Jenkins Environment
+  template:
+    src: jenkins.env.j2
+    dest: /etc/default/jenkins
+
+- name: Create Jenkins systemd service
+  copy:
+    dest: /etc/systemd/system/jenkins.service
+    content: |
+      [Unit]
+      Description=Jenkins
+      After=network.target
+
+      [Service]
+      User=jenkins
+      WorkingDirectory=/opt/jenkins
+      ExecStart=/usr/bin/java -jar /opt/jenkins/jenkins.war --httpPort=8080
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: Start Jenkins Service
+  service:
+    name: jenkins
+    state: started
+    enabled: yes
+
+- name: Install Jenkins Plugins
+  import_tasks: plugins.yml
+
+
+
+FILE: ansible/roles/jenkins/tasks/plugins.yml
+# EMPTY FILE
+FILE: ansible/roles/jenkins/vars/main.yml
+---
+jenkins_admin_user: AniketWakekar
+jenkins_admin_password: 123
+
+dockerhub_username: aniketwakekar
+dockerhub_password: "[-----DOCKERHUB_PASSWORD-----]"
+
+gmail_id: aniketwakekar239@gmail.com
+gmail_app_password: "[-----GMAIL_APP_PASSWORD-----]"
+
+github_url: https://github.com/Wakekar
+
+jenkins_url: "http://[-----JENKINS_SERVER_IP-----]:8080"
+
+sonarqube_url: "http://[-----SONAR_SERVER_IP-----]:9000"
+
+nexus_url: "http://[-----NEXUS_SERVER_IP-----]:8081"
+
+
+
+FILE: ansible/roles/jenkins/templates/master-casc.yaml.j2
+jenkins:
+  systemMessage: "Jenkins configured automatically by Ansible"
+
+  numExecutors: 2
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "{{ jenkins_admin_user }}"
+          password: "{{ jenkins_admin_password }}"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              id: docker-cred
+              username: "{{ dockerhub_username }}"
+              password: "{{ dockerhub_password }}"
+              description: DockerHub Credential
+
+tool:
+  jdk:
+    installations:
+      - name: jdk17
+
+  maven:
+    installations:
+      - name: maven
+
+  dockerTool:
+    installations:
+      - name: docker
+
+unclassified:
+  mailer:
+    smtpHost: smtp.gmail.com
+    smtpPort: "465"
+    useSsl: true
+    authentication:
+      username: "{{ gmail_id }}"
+      password: "{{ gmail_app_password }}"
+
+
+
+FILE: ansible/roles/jenkins/templates/credentials.yaml.j2
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              id: docker-cred
+              username: "{{ dockerhub_username }}"
+              password: "{{ dockerhub_password }}"
+              description: DockerHub Credential
+
+
+FILE: ansible/roles/jenkins/templates/jenkins.yaml.j2
+jenkins:
+  systemMessage: "Jenkins configured automatically by Ansible"
+
+  numExecutors: 2
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "{{ jenkins_admin_user }}"
+          password: "{{ jenkins_admin_password }}"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+
+
+FILE: ansible/roles/jenkins/templates/jenkins.env.j2
+CASC_JENKINS_CONFIG={{ jenkins_casc_file }}
+FILE: ansible/roles/jenkins/templates/smtp.yaml.j2
+unclassified:
+  mailer:
+    smtpHost: smtp.gmail.com
+    smtpPort: "465"
+    useSsl: true
+    authentication:
+      username: "{{ gmail_id }}"
+      password: "{{ gmail_app_password }}"
+
+
+
+FILE: ansible/roles/jenkins/templates/tools.yaml.j2
+tool:
+  jdk:
+    installations:
+      - name: jdk21
+
+  maven:
+    installations:
+      - name: maven
+
+  dockerTool:
+    installations:
+      - name: docker
+
+FILES PRESENT BUT INCOMPLETE
+ansible/roles/jenkins/tasks/plugins.yml
+# File exists but no content has been defined yet.
